@@ -36,7 +36,7 @@ repositories {
 }
 
 base {
-    archivesName = mod_id
+    archivesName = "${mod_name}-${minecraft_version}"
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
@@ -176,7 +176,7 @@ tasks.register('publishCurseForge', TaskPublishCurseForge) {
 
     apiToken = System.getenv("CURSEFORGE_TOKEN")
 
-    def mainFile = upload('1665714', file("build/libs/${mod_name}-neoforge-${minecraft_version}-${mod_version}.jar"))
+    def mainFile = upload('1665714', file("build/libs/${mod_name}-${minecraft_version}-${mod_version}.jar"))
     mainFile.displayName = "${mod_name}-${mod_version}-${minecraft_version}-neforge"
     mainFile.releaseType = 'release'
     mainFile.changelog = changelogText
@@ -194,10 +194,10 @@ tasks.register('publishCurseForge', TaskPublishCurseForge) {
 modrinth {
     token = System.getenv("MODRINTH_TOKEN")
     projectId = "sable-rtp"
-    versionName = "${mod_name}-${mod_version}-${minecraft_version}-neoforge"
+    versionName = "${mod_name}-${mod_version}-${minecraft_version}"
     versionNumber = "${mod_name}-${mod_version}-${minecraft_version}"
     versionType = "release"
-    uploadFile = file("build/libs/${mod_name}-neoforge-${minecraft_version}-${mod_version}.jar")
+    uploadFile = file("build/libs/${mod_name}-${minecraft_version}-${mod_version}.jar")
     gameVersions = ["${minecraft_version}"] as Iterable<? extends String>
     loaders = ["neoforge"]
     changelog = changelogText
