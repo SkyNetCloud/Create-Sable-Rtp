@@ -37,11 +37,7 @@ public class RtpWarmupManager {
         long readyAt = System.currentTimeMillis() + (warmupSeconds * 1000L);
         PENDING.put(player.getUUID(), new PendingTeleport(readyAt, player.position(), onComplete));
 
-        player.displayClientMessage(
-                Component.literal("Teleporting in " + warmupSeconds + "s... don't move!")
-                        .withStyle(ChatFormatting.YELLOW),
-                true
-        );
+        player.displayClientMessage(Component.literal("Teleporting in " + warmupSeconds + "s... don't move!").withStyle(ChatFormatting.YELLOW), true);
     }
 
     public static boolean hasPending(UUID playerId) {
@@ -59,10 +55,7 @@ public class RtpWarmupManager {
 
         if (player.position().distanceToSqr(pending.startPos()) > MOVEMENT_CANCEL_THRESHOLD_SQ) {
             PENDING.remove(player.getUUID());
-            player.displayClientMessage(
-                    Component.literal("Teleport cancelled — you moved.").withStyle(ChatFormatting.RED),
-                    true
-            );
+            player.displayClientMessage(Component.literal("Teleport cancelled — you moved.").withStyle(ChatFormatting.RED), true);
             return;
         }
 
@@ -72,10 +65,7 @@ public class RtpWarmupManager {
             pending.onComplete().run();
         } else {
             long secondsLeft = (pending.readyAtMillis() - now + 999) / 1000L;
-            player.displayClientMessage(
-                    Component.literal("Teleporting in " + secondsLeft + "...").withStyle(ChatFormatting.YELLOW),
-                    true
-            );
+            player.displayClientMessage(Component.literal("Teleporting in " + secondsLeft + "...").withStyle(ChatFormatting.YELLOW), true);
         }
     }
 

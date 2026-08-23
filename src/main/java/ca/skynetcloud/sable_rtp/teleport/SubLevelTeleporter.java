@@ -26,23 +26,19 @@ public class SubLevelTeleporter {
         }
 
         try {
-            // Get current pose
+
             Pose3d currentPose = subLevel.logicalPose();
             Quaterniond currentOrientation = currentPose.orientation();
             Vector3d currentPos = currentPose.position();
 
-            // Calculate the offset
+
             double dx = dest.getX() + 0.5 - currentPos.x;
             double dy = dest.getY() - currentPos.y;
             double dz = dest.getZ() + 0.5 - currentPos.z;
 
-            Vector3d newPosition = new Vector3d(
-                    dest.getX() + 0.5,
-                    dest.getY(),
-                    dest.getZ() + 0.5
-            );
+            Vector3d newPosition = new Vector3d(dest.getX() + 0.5, dest.getY(), dest.getZ() + 0.5);
 
-            // Get all players inside the sublevel
+
             List<ServerPlayer> playersToTeleport = new ArrayList<>();
             var bounds = subLevel.boundingBox();
 
@@ -53,14 +49,12 @@ public class SubLevelTeleporter {
                 }
 
                 Vec3 playerPos = player.position();
-                if (playerPos.x >= bounds.minX() && playerPos.x <= bounds.maxX() &&
-                        playerPos.y >= bounds.minY() && playerPos.y <= bounds.maxY() &&
-                        playerPos.z >= bounds.minZ() && playerPos.z <= bounds.maxZ()) {
+                if (playerPos.x >= bounds.minX() && playerPos.x <= bounds.maxX() && playerPos.y >= bounds.minY() && playerPos.y <= bounds.maxY() && playerPos.z >= bounds.minZ() && playerPos.z <= bounds.maxZ()) {
                     playersToTeleport.add(player);
                 }
             }
 
-            // Store vehicle info for each player
+
             Map<ServerPlayer, Entity> playerVehicles = new HashMap<>();
             Map<ServerPlayer, Vec3> playerRelativeToVehicle = new HashMap<>();
 
@@ -68,78 +62,47 @@ public class SubLevelTeleporter {
                 if (player.getVehicle() != null) {
                     Entity vehicle = player.getVehicle();
                     playerVehicles.put(player, vehicle);
-                    // Store relative position to vehicle
+
                     Vec3 relative = player.position().subtract(vehicle.position());
                     playerRelativeToVehicle.put(player, relative);
                 }
             }
 
-            // Teleport the sublevel physics
+
             PhysicsPipeline pipeline = SubLevelPhysicsSystem.require(level).getPipeline();
             pipeline.teleport(subLevel, newPosition, currentOrientation);
 
-            // Teleport all players
+
             for (ServerPlayer player : playersToTeleport) {
                 Entity vehicle = playerVehicles.get(player);
 
                 if (vehicle != null && vehicle.isAlive()) {
-                    // Teleport the vehicle with offset
-                    vehicle.teleportTo(
-                            level,
-                            vehicle.getX() + dx,
-                            vehicle.getY() + dy,
-                            vehicle.getZ() + dz,
-                            Set.of(),
-                            vehicle.getYRot(),
-                            vehicle.getXRot()
-                    );
 
-                    // Teleport player to maintain relative position to vehicle
+                    vehicle.teleportTo(level, vehicle.getX() + dx, vehicle.getY() + dy, vehicle.getZ() + dz, Set.of(), vehicle.getYRot(), vehicle.getXRot());
+
+
                     Vec3 relative = playerRelativeToVehicle.get(player);
                     if (relative != null) {
-                        player.teleportTo(
-                                level,
-                                vehicle.getX() + relative.x,
-                                vehicle.getY() + relative.y,
-                                vehicle.getZ() + relative.z,
-                                Set.of(),
-                                player.getYRot(),
-                                player.getXRot()
-                        );
+                        player.teleportTo(level, vehicle.getX() + relative.x, vehicle.getY() + relative.y, vehicle.getZ() + relative.z, Set.of(), player.getYRot(), player.getXRot());
                     }
 
-                    // Ensure player is riding the vehicle
+
                     if (player.getVehicle() == null) {
                         player.startRiding(vehicle);
                     }
                 } else {
-                    // Not riding - teleport player with same offset
-                    player.teleportTo(
-                            level,
-                            player.getX() + dx,
-                            player.getY() + dy,
-                            player.getZ() + dz,
-                            Set.of(),
-                            player.getYRot(),
-                            player.getXRot()
-                    );
+
+                    player.teleportTo(level, player.getX() + dx, player.getY() + dy, player.getZ() + dz, Set.of(), player.getYRot(), player.getXRot());
                 }
             }
 
-            // Log the teleport
+
             String subLevelName = subLevel.getName();
             if (subLevelName == null) {
                 subLevelName = "unnamed";
             }
 
-            LOGGER.info(
-                    "Teleported sub-level '{}' (id={}) to {} in {} with {} players",
-                    subLevelName,
-                    subLevel.getUniqueId(),
-                    dest,
-                    level.dimension().location(),
-                    playersToTeleport.size()
-            );
+            LOGGER.info("Teleported sub-level '{}' (id={}) to {} in {} with {} players", subLevelName, subLevel.getUniqueId(), dest, level.dimension().location(), playersToTeleport.size());
 
             return true;
 

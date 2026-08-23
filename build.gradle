@@ -1,12 +1,19 @@
+import net.darkhax.curseforgegradle.TaskPublishCurseForge
+
 plugins {
     id 'java-library'
     id 'maven-publish'
     id 'idea'
     id 'net.neoforged.moddev' version '2.0.144'
+    id 'com.modrinth.minotaur' version '2.+'
+    id 'net.darkhax.curseforgegradle' version '1.1.18'
 }
 
 version = mod_version
 group = mod_group_id
+
+def changelogText = project.file('changelog.md').exists() ? project.file('changelog.md').text : "No changelog available"
+def site_debugMode = false
 
 repositories {
     mavenLocal()
@@ -162,4 +169,48 @@ idea {
         downloadSources = true
         downloadJavadoc = true
     }
+}
+
+tasks.register('publishCurseForge', TaskPublishCurseForge) {
+    dependsOn jar
+
+    apiToken = System.getenv("CURSEFORGE_TOKEN")
+
+    def mainFile = upload('1665714', file("build/libs/${mod_name}-neoforge-${minecraft_version}-${mod_version}.jar"))
+    mainFile.displayName = "${mod_name}-${mod_version}-${minecraft_version}-neforge"
+    mainFile.releaseType = 'release'
+    mainFile.changelog = changelogText
+    debugMode = site_debugMode
+    mainFile.addGameVersion("${minecraft_version}")
+    mainFile.addGameVersion("NeoForge")
+    mainFile.addGameVersion("Client")
+    mainFile.addGameVersion("Server")
+
+    mainFile.addRequirement("create")
+    mainFile.addRequirement("sable")
+    mainFile.addRequirement("create-aeronautics")
+}
+
+modrinth {
+    token = System.getenv("MODRINTH_TOKEN")
+    projectId = "sable-rtp"
+    versionName = "${mod_name}-${mod_version}-${minecraft_version}-neoforge"
+    versionNumber = "${mod_name}-${mod_version}-${minecraft_version}"
+    versionType = "release"
+    uploadFile = file("build/libs/${mod_name}-neoforge-${minecraft_version}-${mod_version}.jar")
+    gameVersions = ["${minecraft_version}"] as Iterable<? extends String>
+    loaders = ["neoforge"]
+    changelog = changelogText
+    debugMode = site_debugMode
+
+    dependencies {
+        required.project 'sable'
+        required.project 'create'
+        required.project 'create-aeronautics'
+    }
+}
+
+task publishModdedSite {
+    group = 'publishing'
+    dependsOn 'build', 'publishCurseForge', 'modrinth'
 }

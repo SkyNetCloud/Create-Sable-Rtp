@@ -34,11 +34,7 @@ public class RtpCommand {
     private static final Map<UUID, Long> lastTeleportTime = new HashMap<>();
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(
-                Commands.literal("sablertp")
-                        .requires(src -> src.hasPermission(0))
-                        .executes(RtpCommand::handleRtpCommandExecution)
-        );
+        dispatcher.register(Commands.literal("sablertp").requires(src -> src.hasPermission(0)).executes(RtpCommand::handleRtpCommandExecution));
     }
 
     private static int handleRtpCommandExecution(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
@@ -54,9 +50,7 @@ public class RtpCommand {
         if (!source.hasPermission(COOLDOWN_BYPASS_PERMISSION_LEVEL)) {
             long remaining = remainingCooldownSeconds(player);
             if (remaining > 0) {
-                source.sendFailure(Component.literal(
-                        "You must wait " + formatDuration(remaining) + " before using /sablertp again."
-                ).withStyle(ChatFormatting.RED));
+                source.sendFailure(Component.literal("You must wait " + formatDuration(remaining) + " before using /sablertp again.").withStyle(ChatFormatting.RED));
                 return 0;
             }
         }
@@ -92,15 +86,12 @@ public class RtpCommand {
         preloadChunks(level, dest, 3);
 
         int attemptsUsed = attempts[0];
-        RtpWarmupManager.schedule(player, () ->
-                finishTeleport(player, serverSubLevel, level, dest, attemptsUsed));
+        RtpWarmupManager.schedule(player, () -> finishTeleport(player, serverSubLevel, level, dest, attemptsUsed));
 
         return 1;
     }
 
-    private static void finishTeleport(ServerPlayer player, ServerSubLevel serverSubLevel,
-                                       ServerLevel level, BlockPos dest, int attemptsUsed) {
-        // Simply call teleport - it handles everything internally
+    private static void finishTeleport(ServerPlayer player, ServerSubLevel serverSubLevel, ServerLevel level, BlockPos dest, int attemptsUsed) {
         boolean ok = SubLevelTeleporter.teleport(serverSubLevel, level, dest);
 
         if (!ok) {
@@ -111,9 +102,7 @@ public class RtpCommand {
         lastTeleportTime.put(player.getUUID(), System.currentTimeMillis());
 
         String locationMsg = String.format("[x %d, y %d, z %d]", dest.getX(), dest.getY(), dest.getZ());
-        player.displayClientMessage(Component.literal(
-                "Whoosh! Found a good location after " + attemptsUsed + " attempt(s) @ " + locationMsg
-        ).withStyle(ChatFormatting.GREEN), false);
+        player.displayClientMessage(Component.literal("Whoosh! Found a good location after " + attemptsUsed + " attempt(s) @ " + locationMsg).withStyle(ChatFormatting.GREEN), false);
     }
 
     private static long remainingCooldownSeconds(ServerPlayer player) {
