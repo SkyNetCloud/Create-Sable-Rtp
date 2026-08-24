@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory;
 public class SubLevelUtils {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("sable_rtp");
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
 
     private static final int TELEPORT_SEARCH_RADIUS = Config.getTeleportSearchRadius();
     private static final int MAX_LOCATION_LOOKUP_ATTEMPTS = Config.getMaxLocationLookupAttempts();
