@@ -1,18 +1,15 @@
 package ca.skynetcloud.sable_rtp.commands;
 
 import ca.skynetcloud.sable_rtp.Config;
-import ca.skynetcloud.sable_rtp.Sable_rtp;
 import ca.skynetcloud.sable_rtp.teleport.RtpWarmupManager;
 import ca.skynetcloud.sable_rtp.teleport.SubLevelTeleporter;
 import ca.skynetcloud.sable_rtp.utils.SubLevelUtils;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
-import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -25,116 +22,119 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import static ca.skynetcloud.sable_rtp.Sable_rtp.MODID;
 import static ca.skynetcloud.sable_rtp.utils.SubLevelUtils.*;
+import static net.minecraft.commands.Commands.literal;
 
-@EventBusSubscriber(modid = Sable_rtp.MODID)
+
+@EventBusSubscriber(modid = MODID)
 public class RtpCommand {
 
-    private static final int COOLDOWN_BYPASS_PERMISSION_LEVEL = 2;
-    private static final Map<UUID, Long> lastTeleportTime = new HashMap<>();
+    private static final int COOLDOWN_BYPASS_LEVEL = 2;
+    private static final Map<UUID, Long> lastDestinationTime = new HashMap<>();
+
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("sablertp").requires(src -> src.hasPermission(0)).executes(RtpCommand::handleRtpCommandExecution));
+        dispatcher.register(literal("sablertp").requires(src -> src.hasPermission(0)).executes(
+                RtpCommand::rtpExecution
+        ));
     }
 
-    private static int handleRtpCommandExecution(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        CommandSourceStack source = ctx.getSource();
-        ServerPlayer player = source.getPlayerOrException();
-        ServerLevel level = source.getLevel();
+    private static int rtpExecution(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer serverPlayer = source.getPlayer();
+        ServerLevel serverLevel = source.getLevel();
 
-        if (RtpWarmupManager.hasPending(player.getUUID())) {
-            source.sendFailure(Component.literal("You already have a teleport pending!"));
-            return 0;
+        assert serverPlayer != null;
+        if (RtpWarmupManager.hasPending(serverPlayer.getUUID())) {
+            source.sendFailure(Component.translatable("message.pending.text"));
         }
 
-        if (!source.hasPermission(COOLDOWN_BYPASS_PERMISSION_LEVEL)) {
-            long remaining = remainingCooldownSeconds(player);
+        if (!source.hasPermission(COOLDOWN_BYPASS_LEVEL)) {
+            long remaining = remainingTimeInSeconds(serverPlayer);
             if (remaining > 0) {
-                source.sendFailure(Component.literal("You must wait " + formatDuration(remaining) + " before using /sablertp again.").withStyle(ChatFormatting.RED));
+                source.sendFailure(Component.translatable( "message.wait.text",fixDurationFormat(remaining) ).withStyle(ChatFormatting.RED));
                 return 0;
             }
         }
-
-        SubLevel subLevel = SubLevelUtils.resolve(player);
-        if (subLevel == null) {
-            source.sendFailure(Component.literal("You need to be sitting on (or standing on) your contraption to /sablertp it."));
-            return 0;
-        }
+        SubLevel subLevel = SubLevelUtils.resolve(serverPlayer);
 
         if (!(subLevel instanceof ServerSubLevel serverSubLevel)) {
-            source.sendFailure(Component.literal("That contraption isn't server-side, can't teleport it."));
+            source.sendFailure(Component.translatable("message.notserversided.text"));
             return 0;
         }
 
         if (isInWater(serverSubLevel)) {
-            source.sendFailure(Component.literal("You cannot RTP a water ship! Only airships and ground vehicles can be teleported."));
+            source.sendFailure(Component.translatable("message.noallowedwatership.text"));
             return 0;
         }
 
-        boolean isSableAirship = isAirborne(serverSubLevel);
+        boolean isAirship = isAirborne(serverSubLevel);
 
-        source.sendSuccess(() -> Component.literal("Searching for a safe location...").withStyle(ChatFormatting.GRAY), false);
+        source.sendSuccess(() -> Component.translatable("message.findingdestination.text").withStyle(ChatFormatting.GRAY), false);
 
         int[] attempts = new int[1];
-        BlockPos dest = locateSafeTeleportPos(level, serverSubLevel, isSableAirship, attempts);
+        BlockPos destination = locateSafeTeleportPos(serverLevel, serverSubLevel, isAirship, attempts);
 
-        if (dest == null) {
-            source.sendFailure(Component.literal("Couldn't find a safe destination, try again."));
+        if (destination == null) {
+            source.sendFailure(Component.translatable("message.notsafe.text"));
             return 0;
         }
 
-        preloadChunks(level, dest, 3);
+        preloadChucksSystem(serverLevel,destination);
 
         int attemptsUsed = attempts[0];
-        RtpWarmupManager.schedule(player, () -> finishTeleport(player, serverSubLevel, level, dest, attemptsUsed));
+        RtpWarmupManager.schedule(serverPlayer, () -> completingTeleport(serverPlayer, serverSubLevel, serverLevel, destination, attemptsUsed));
+
 
         return 1;
     }
 
-    private static void finishTeleport(ServerPlayer player, ServerSubLevel serverSubLevel, ServerLevel level, BlockPos dest, int attemptsUsed) {
-        boolean ok = SubLevelTeleporter.teleport(serverSubLevel, level, dest);
+    private static void completingTeleport(ServerPlayer serverPlayer, ServerSubLevel serverSubLevel, ServerLevel serverLevel, BlockPos destination, int attemptsUsed) {
+      boolean okay = SubLevelTeleporter.teleport(serverSubLevel, serverLevel, destination);
 
-        if (!ok) {
-            player.displayClientMessage(Component.literal("Teleport failed.").withStyle(ChatFormatting.RED), false);
-            return;
-        }
+      if (!okay) {
+          serverPlayer.displayClientMessage(Component.translatable("message.teleportfailed.text").withStyle(ChatFormatting.RED), false);
+          return;
+      }
+       lastDestinationTime.put(serverPlayer.getUUID(), System.currentTimeMillis());
 
-        lastTeleportTime.put(player.getUUID(), System.currentTimeMillis());
+      String destinationMsg = String.format("[x %d, y %d, z %d]", destination.getX(), destination.getY(), destination.getZ());
+      serverPlayer.displayClientMessage(Component.translatable("message.destinationFound.text", attemptsUsed, destinationMsg).withStyle(ChatFormatting.GOLD), false);
 
-        String locationMsg = String.format("[x %d, y %d, z %d]", dest.getX(), dest.getY(), dest.getZ());
-        player.displayClientMessage(Component.literal("Whoosh! Found a good location after " + attemptsUsed + " attempt(s) @ " + locationMsg).withStyle(ChatFormatting.GREEN), false);
     }
 
-    private static long remainingCooldownSeconds(ServerPlayer player) {
-        Long lastUse = lastTeleportTime.get(player.getUUID());
-        if (lastUse == null) return 0L;
+    private static Long remainingTimeInSeconds(ServerPlayer serverPlayer) {
+        Long lastUsed = lastDestinationTime.get(serverPlayer.getUUID());
+        if (lastUsed == null) return 0L;
 
-        long elapsedSeconds = (System.currentTimeMillis() - lastUse) / 1000L;
-        long remaining = Config.getTeleportCooldownSeconds() - elapsedSeconds;
-        return Math.max(0L, remaining);
+        long elapsedTimeInSeconds = System.currentTimeMillis() - lastUsed;
+        long remainingTime = Config.getTeleportCooldownSeconds() - elapsedTimeInSeconds;
+
+        return Math.max(0L, remainingTime);
     }
 
-    private static String formatDuration(long totalSeconds) {
-        long minutes = totalSeconds / 60;
+    private static String fixDurationFormat(long totalSeconds) {
+        long mins = totalSeconds / 60;
         long seconds = totalSeconds % 60;
-        return minutes > 0 ? (minutes + "m " + seconds + "s") : (seconds + "s");
+        return mins > 0 ? (mins + "m " + seconds + "s") : (seconds + "s");
     }
 
-    private static void preloadChunks(ServerLevel level, BlockPos center, int radius) {
-        int centerChunkX = center.getX() >> 4;
-        int centerChunkZ = center.getZ() >> 4;
+    private static void preloadChucksSystem(ServerLevel level, BlockPos pos) {
+        int chunkX = pos.getX() >> 4;
+        int chunkZ = pos.getZ() >> 4;
+        int radiusOverall = 3;
 
-        for (int dx = -radius; dx <= radius; dx++) {
-            for (int dz = -radius; dz <= radius; dz++) {
-                level.getChunk(centerChunkX + dx, centerChunkZ + dz);
+        for (int cx = -radiusOverall; cx <= radiusOverall; cx++) {
+            for (int cz = -radiusOverall; cz <= radiusOverall; cz++) {
+                level.getChunk(chunkX + cx, cz + chunkZ);
             }
         }
     }
 
     @SubscribeEvent
-    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
-        if (event.getEntity() != null) {
-            lastTeleportTime.remove(event.getEntity().getUUID());
-        }
+    public static void onPlayerLeave(PlayerEvent.PlayerLoggedOutEvent event) {
+        lastDestinationTime.remove(event.getEntity().getUUID());
     }
+
 }

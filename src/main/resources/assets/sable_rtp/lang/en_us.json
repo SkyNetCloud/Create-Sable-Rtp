@@ -1,0 +1,11 @@
+{
+  "message.destinationFound.text": "Found safe destination after %s attempt(s) @ %s",
+  "message.teleportfailed.text": "Teleport failed!",
+  "message.findingdestination.text": "Searching for a safe destination...",
+  "message.notserversided.text": "That contraption isn't server-side, can't teleport it.",
+  "message.notsafe.text": "Couldn't find a safe destination, try again.",
+  "message.noallowedwatership.text": "You cannot RTP a water ship! Only airships and ground vehicles can be teleported.",
+  "message.notonship.text": "You need to be sitting on (or standing on) your contraption to do /sablertp",
+  "message.wait.text": "You must wait %s before using /sablertp again.",
+  "message.pending.text": "You already have a teleport pending!"
+}

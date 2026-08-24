@@ -111,7 +111,6 @@ public class SubLevelUtils {
                 continue;
             }
 
-
             level.getChunk(x >> 4, z >> 4);
 
             int destY;

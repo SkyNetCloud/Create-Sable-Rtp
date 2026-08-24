@@ -195,7 +195,7 @@ modrinth {
     token = System.getenv("MODRINTH_TOKEN")
     projectId = "sable-rtp"
     versionName = "${mod_name}-${mod_version}-${minecraft_version}"
-    versionNumber = "${mod_name}-${mod_version}-${minecraft_version}"
+    versionNumber = "${mod_version}"
     versionType = "release"
     uploadFile = file("build/libs/${mod_name}-${minecraft_version}-${mod_version}.jar")
     gameVersions = ["${minecraft_version}"] as Iterable<? extends String>
@@ -210,7 +210,7 @@ modrinth {
     }
 }
 
-task publishModdedSite {
+tasks.register('publishModdedSite') {
     group = 'publishing'
     dependsOn 'build', 'publishCurseForge', 'modrinth'
 }
