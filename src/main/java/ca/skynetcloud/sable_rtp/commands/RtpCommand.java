@@ -64,17 +64,13 @@ public class RtpCommand {
             return 0;
         }
 
-        if (isInWater(serverSubLevel)) {
-            source.sendFailure(Component.translatable("message.noallowedwatership.text"));
-            return 0;
-        }
-
-        boolean isAirship = isAirborne(serverSubLevel);
+        boolean isWatership = isInWater(serverSubLevel);
+        boolean isAirship = !isWatership && isAirborne(serverSubLevel);
 
         source.sendSuccess(() -> Component.translatable("message.findingdestination.text").withStyle(ChatFormatting.GRAY), false);
 
         int[] attempts = new int[1];
-        BlockPos destination = locateSafeTeleportPos(serverLevel, serverSubLevel, isAirship, attempts);
+        BlockPos destination = locateSafeTeleportPos(serverLevel, serverSubLevel, isAirship, isWatership, attempts);
 
         if (destination == null) {
             source.sendFailure(Component.translatable("message.notsafe.text"));

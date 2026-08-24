@@ -81,7 +81,9 @@ public class SubLevelUtils {
         return (double) waterCount / totalSamples > 0.6;
     }
 
-    public static BlockPos locateSafeTeleportPos(ServerLevel level, ServerSubLevel subLevel, boolean isAirship, int[] attemptsOut) {
+
+
+    public static BlockPos locateSafeTeleportPos(ServerLevel level, ServerSubLevel subLevel, boolean isAirship, boolean isInWater, int[] attemptsOut) {
         RandomSource rand = level.getRandom();
 
         BoundingBox3dc bounds = subLevel.boundingBox();
@@ -96,6 +98,8 @@ public class SubLevelUtils {
 
         int minY = level.getMinBuildHeight() + 1;
         int maxY = level.getMaxBuildHeight() - 5;
+
+        VesselType vesselType = isInWater ? VesselType.BOAT : (isAirship ? VesselType.AIRSHIP : VesselType.GROUND);
 
         for (int attempt = 0; attempt < MAX_LOCATION_LOOKUP_ATTEMPTS; attempt++) {
             int x = rand.nextInt(TELEPORT_SEARCH_RADIUS * 2) - TELEPORT_SEARCH_RADIUS;
@@ -114,8 +118,19 @@ public class SubLevelUtils {
             level.getChunk(x >> 4, z >> 4);
 
             int destY;
+            if (isInWater) {
+                int getSurfaceHeightMap = getHighestTerrainUnderFootprint(level, x, z, halfSizeX, halfSizeZ);
 
-            if (isAirship) {
+                if (getSurfaceHeightMap <= level.getMinBuildHeight()) {
+                    continue;
+                }
+
+                destY = getSurfaceHeightMap - 1;
+
+                destY = Math.min(destY, maxY);
+                destY = Math.max(destY, minY);
+
+            } else if (isAirship) {
 
                 int terrainHeight = getHighestTerrainUnderFootprint(level, x, z, halfSizeX, halfSizeZ);
 
@@ -157,7 +172,7 @@ public class SubLevelUtils {
 
             BlockPos finalPos = new BlockPos(x, destY, z);
 
-            if (isSafeDestination(level, finalPos, isAirship)) {
+            if (isSafeDestination(level, finalPos, vesselType, halfSizeX, halfSizeZ)) {
                 attemptsOut[0] = attempt + 1;
                 return finalPos;
             }
@@ -197,7 +212,40 @@ public class SubLevelUtils {
         return maxHeight;
     }
 
-    private static boolean isSafeDestination(ServerLevel level, BlockPos pos, boolean isAirship) {
+    public enum VesselType {
+        GROUND,AIRSHIP,BOAT
+    }
+
+    private static boolean isWaterObstructed(ServerLevel level, BlockPos pos) {
+        var fluid = level.getFluidState(pos).getType();
+        return fluid == Fluids.WATER || fluid == Fluids.FLOWING_WATER;
+    }
+
+    private static double getHighestWaterRatio(ServerLevel level, BlockPos center, double halfSizeX, double halfSizeZ) {
+        int[] offsets = {-1, 0, 1};
+        int total = 0;
+        int waterCount = 0;
+
+        for (int dx : offsets) {
+            for (int dz : offsets) {
+                int sampleX = center.getX() + (int) (dx * halfSizeX);
+                int sampleZ = center.getZ() + (int) (dz * halfSizeZ);
+                BlockPos samplePos = new BlockPos(sampleX, center.getY(), sampleZ);
+
+                if (!level.isInWorldBounds(samplePos)) continue;
+
+                total++;
+                if (isWaterObstructed(level, samplePos)) {
+                    waterCount++;
+                }
+            }
+        }
+
+        return total == 0 ? 0.0 : (double) waterCount / total;
+    }
+
+
+    private static boolean isSafeDestination(ServerLevel level, BlockPos pos, VesselType vesselType, double halfSizeX, double halfSizeZ) {
         if (!level.isInWorldBounds(pos)) {
             return false;
         }
@@ -214,26 +262,64 @@ public class SubLevelUtils {
             return false;
         }
 
-        if (isAirship) {
-            int spaceNeeded = 10;
-            for (int i = 0; i < spaceNeeded; i++) {
-                BlockPos checkPos = pos.above(i);
-                if (!level.isInWorldBounds(checkPos)) {
-                    return false;
+        return switch (vesselType) {
+            case GROUND -> {
+                if (pos.getY() < level.getSeaLevel()) {
+                    yield false;
                 }
+                if (!level.getBlockState(pos).isAir()) {
+                    yield false;
+                }
+                BlockPos abovePos = pos.above();
+                yield level.getBlockState(abovePos).isAir();
             }
-            return true;
-        } else {
-            if (pos.getY() < level.getSeaLevel()) {
-                return false;
+            case AIRSHIP -> {
+                int spaceNeeded = 10;
+                for (int i = 0; i < spaceNeeded; i++) {
+                    BlockPos getCheckPos = pos.above();
+                    if (!level.isInWorldBounds(getCheckPos)){
+
+                    }
+                }
+                yield true;
+            }
+            case  BOAT -> {
+                if (!isWaterObstructed(level, pos)) {
+                    yield false;
+                }
+
+                if (getHighestWaterRatio(level, pos, halfSizeX, halfSizeZ) < 0.85) {
+                    yield false;
+                }
+
+
+                int waterDepth = 0;
+                for (int i = 0; i < 4; i++) {
+                    BlockPos below = pos.below(i + 1);
+                    if (!level.isInWorldBounds(below)) break;
+                    if (isWaterObstructed(level, below)) {
+                        waterDepth++;
+                    } else {
+                        break;
+                    }
+                }
+                if (waterDepth < 4) {
+                    yield false;
+                }
+
+                for (int i = 1; i <= 5; i++) {
+                    BlockPos above = pos.above(i);
+                    if (!level.isInWorldBounds(above)) yield false;
+                    if (!level.getBlockState(above).isAir() && !isWaterObstructed(level, above)) {
+                        yield false;
+                    }
+                }
+
+                yield true;
             }
 
-            if (!level.getBlockState(pos).isAir()) {
-                return false;
-            }
-            BlockPos abovePos = pos.above();
-            return level.getBlockState(abovePos).isAir();
-        }
+        };
+
     }
 
 }
