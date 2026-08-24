@@ -120,6 +120,7 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 dependencies {
     api("dev.ryanhcode.sable:sable-common-${project.minecraft_version}:${project.sable_version}")
+    runtimeOnly("dev.ryanhcode.sable:sable-common-${project.minecraft_version}:${project.sable_version}")
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.
